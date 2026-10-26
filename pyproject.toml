@@ -1,0 +1,30 @@
+[project]
+name = "paymentops-ai"
+version = "0.1.0"
+description = "AI-assisted payment exception review with policy RAG and human-in-the-loop approval (simulated decisions only)."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "langgraph>=1.0",
+    "langgraph-checkpoint-postgres>=2.0",
+    "langgraph-checkpoint-sqlite>=2.0",
+    "qdrant-client>=1.12",
+    "anthropic>=0.40",
+    "pydantic-settings>=2.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "integration: opt-in, requires real PostgreSQL + Qdrant (see tests/test_integration.py)",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

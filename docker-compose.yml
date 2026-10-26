@@ -1,0 +1,66 @@
+# Local demo/dev stack. All three published ports are bound to 127.0.0.1
+# only, deliberately - nothing here is meant to be reachable from another
+# machine. The default POSTGRES_PASSWORD and REVIEWER_API_KEYS below are
+# demo credentials checked into this file for convenience; replace both
+# (and reconsider the port bindings) before running any of this outside a
+# single developer's own machine. See README "Known limitations".
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: paymentops
+      POSTGRES_PASSWORD: paymentops
+      POSTGRES_DB: paymentops
+    ports:
+      # Localhost-only: this is a demo stack, not a deployment. Remove the
+      # 127.0.0.1 prefix (or publish nothing at all, since the api service
+      # reaches postgres over the compose network regardless) only if you
+      # have deliberately decided this needs to be reachable from outside
+      # this machine - see README "Known limitations".
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paymentops -d paymentops"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    ports:
+      - "127.0.0.1:6333:6333"  # localhost-only - see the postgres service's port comment
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://paymentops:paymentops@postgres:5432/paymentops
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: dispute_policies
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5}
+      # Supplied from your shell or a local .env; never baked into the image.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      # Demo-only reviewer credentials. Replace before any real deployment.
+      REVIEWER_API_KEYS: ${REVIEWER_API_KEYS:-cfo@example.com:demo-reviewer-key}
+    ports:
+      - "127.0.0.1:8000:8000"  # localhost-only - see the postgres service's port comment
+    command: >
+      sh -c "python -m app.seed && uvicorn app.api:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  postgres_data:
+  qdrant_data:
